@@ -1,0 +1,1740 @@
+<!DOCTYPE html>
+<html lang="th" class="h-full bg-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบบันทึกงานซ่อมมือถือ & รับชำระค่างวด (Mobile POS System)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter & Kanit -->
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Kanit', 'Prompt', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#094d73',
+                            800: '#073b57',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Kanit', sans-serif;
+            touch-action: manipulation;
+        }
+
+        /* Styles for Print Layouts */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #print-area, #print-area * {
+                visibility: visible;
+            }
+            #print-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                margin: 0;
+                padding: 0;
+                background: white !important;
+                color: black !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+
+        /* Preset Dynamic Paper Sizes for CSS Preview */
+        .paper-58mm {
+            width: 58mm;
+            padding: 4mm;
+            font-size: 11px;
+            line-height: 1.3;
+        }
+        .paper-80mm {
+            width: 80mm;
+            padding: 6mm;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        .paper-a4 {
+            width: 210mm;
+            min-height: 297mm;
+            padding: 15mm;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col text-slate-800 bg-slate-100 antialiased selection:bg-brand-500 selection:text-white">
+
+    <!-- Header Navigation -->
+    <header class="bg-slate-900 text-white shadow-md sticky top-0 z-30 no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-brand-500 p-2.5 rounded-xl shadow-lg shadow-brand-500/30 flex items-center justify-center">
+                    <i class="fa-solid fa-mobile-retro text-xl text-white"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight tracking-wide text-white">ระบบงานซ่อม & จ่ายค่างวดมือถือ POS</h1>
+                    <p class="text-xs text-slate-400 font-normal">Offline 100% | รับซ่อม | คำนวณผ่อน | รับค่างวด SG/KBJ | สลิป 58/80mm/A4</p>
+                </div>
+            </div>
+
+            <!-- Header Action Buttons -->
+            <div class="flex items-center space-x-2">
+                <button onclick="openShopSettingsModal()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-sm font-medium transition flex items-center space-x-2 border border-slate-700">
+                    <i class="fa-solid fa-store text-brand-500"></i>
+                    <span class="hidden sm:inline">ตั้งค่าร้าน & QR โค้ด</span>
+                </button>
+                <button onclick="switchTab('pay-installment')" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition flex items-center space-x-1.5 shadow-md shadow-emerald-600/20">
+                    <i class="fa-solid fa-hand-holding-dollar"></i>
+                    <span>รับค่างวด</span>
+                </button>
+                <button onclick="switchTab('new-repair')" class="px-3.5 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm font-medium transition flex items-center space-x-1.5 shadow-md shadow-brand-500/20">
+                    <i class="fa-solid fa-circle-plus"></i>
+                    <span>ออกใบซ่อม</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Layout -->
+    <div class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6 no-print">
+
+        <!-- Left Navigation Sidebar -->
+        <nav class="lg:col-span-3 space-y-2">
+            <div class="bg-white rounded-2xl p-3 shadow-sm border border-slate-200/80 sticky top-20">
+                <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 py-2">เมนูหลัก</div>
+                
+                <button id="nav-btn-new-repair" onclick="switchTab('new-repair')" class="w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between bg-brand-50 text-brand-600 border border-brand-100">
+                    <div class="flex items-center space-x-3">
+                        <i class="fa-solid fa-wrench w-5 text-center text-lg"></i>
+                        <span>รับซ่อม / บันทึกงาน</span>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-xs opacity-60"></i>
+                </button>
+
+                <button id="nav-btn-pay-installment" onclick="switchTab('pay-installment')" class="w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between text-slate-600 hover:bg-slate-50 hover:text-slate-900 mt-1">
+                    <div class="flex items-center space-x-3">
+                        <i class="fa-solid fa-receipt w-5 text-center text-lg text-emerald-600"></i>
+                        <span>รับชำระค่างวดมือถือ</span>
+                    </div>
+                    <span id="badge-installment-payments" class="bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded-full font-bold">0</span>
+                </button>
+
+                <button id="nav-btn-installment" onclick="switchTab('installment')" class="w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between text-slate-600 hover:bg-slate-50 hover:text-slate-900 mt-1">
+                    <div class="flex items-center space-x-3">
+                        <i class="fa-solid fa-calculator w-5 text-center text-lg text-amber-500"></i>
+                        <span>คำนวณผ่อน / งวดมือถือ</span>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-xs opacity-60"></i>
+                </button>
+
+                <button id="nav-btn-list" onclick="switchTab('list')" class="w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between text-slate-600 hover:bg-slate-50 hover:text-slate-900 mt-1">
+                    <div class="flex items-center space-x-3">
+                        <i class="fa-solid fa-list-check w-5 text-center text-lg"></i>
+                        <span>รายการงานซ่อมทั้งหมด</span>
+                    </div>
+                    <span id="badge-total-jobs" class="bg-slate-200 text-slate-700 text-xs px-2 py-0.5 rounded-full font-bold">0</span>
+                </button>
+
+                <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 py-2 mt-4">การตั้งค่า</div>
+                <button onclick="openShopSettingsModal()" class="w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center space-x-3 text-slate-600 hover:bg-slate-50 hover:text-slate-900">
+                    <i class="fa-solid fa-qrcode w-5 text-center text-lg text-emerald-600"></i>
+                    <span>ตั้งค่า QR รับเงิน & ชื่อร้าน</span>
+                </button>
+
+                <!-- Status Summary Box -->
+                <div class="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200/60">
+                    <div class="text-xs font-semibold text-slate-500 mb-2">สรุปสถานะงานวันนี้</div>
+                    <div class="space-y-1.5 text-xs">
+                        <div class="flex justify-between text-slate-600">
+                            <span><i class="fa-solid fa-circle text-[8px] text-amber-500 mr-1.5"></i>รับเครื่องใหม่/กำลังซ่อม:</span>
+                            <span id="stat-pending" class="font-bold text-slate-800">0</span>
+                        </div>
+                        <div class="flex justify-between text-slate-600">
+                            <span><i class="fa-solid fa-circle text-[8px] text-emerald-500 mr-1.5"></i>ซ่อมเสร็จแล้ว:</span>
+                            <span id="stat-ready" class="font-bold text-slate-800">0</span>
+                        </div>
+                        <div class="flex justify-between text-slate-600">
+                            <span><i class="fa-solid fa-circle text-[8px] text-blue-500 mr-1.5"></i>ส่งคืนลูกค้าแล้ว:</span>
+                            <span id="stat-completed" class="font-bold text-slate-800">0</span>
+                        </div>
+                        <div class="flex justify-between text-slate-600 pt-1 border-t border-slate-200">
+                            <span><i class="fa-solid fa-circle text-[8px] text-emerald-600 mr-1.5"></i>รับชำระค่างวดสะสม:</span>
+                            <span id="stat-installment-count" class="font-bold text-emerald-700">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Right Content Area -->
+        <main class="lg:col-span-9 space-y-6">
+
+            <!-- TAB 1: NEW REPAIR FORM -->
+            <div id="tab-new-repair" class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 sm:p-8 space-y-6">
+                
+                <!-- Section Header -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-2">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-file-signature text-brand-500"></i>
+                            บันทึกงานซ่อมใหม่ / ออกสลิป
+                        </h2>
+                        <p class="text-xs text-slate-500 mt-0.5">เลือกเมนูด่วนหรือกรอกรายละเอียดงานซ่อมเพื่อพิมพ์สลิป</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-medium text-slate-500">เลขที่ใบซ่อม:</span>
+                        <span id="repair-ticket-id" class="text-xs font-mono font-bold bg-slate-100 text-brand-600 px-3 py-1 rounded-lg border border-slate-200">JOB-XXXX</span>
+                    </div>
+                </div>
+
+                <!-- QUICK PRESET BUTTONS -->
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+                            <i class="fa-solid fa-bolt text-amber-500"></i>
+                            เมนูด่วนบริการซ่อม & เปลี่ยนอะไหล่ (กดเลือกได้ทันที):
+                        </label>
+                        <span class="text-[11px] text-slate-400">*ไม่ใส่ราคาล่วงหน้า สามารถกำหนดราคาได้ในตารางด้านล่าง</span>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                        <!-- ซอฟต์แวร์ & ไอดี -->
+                        <button type="button" onclick="addQuickPreset('แก้ไวรัส')" class="p-2.5 bg-slate-50 hover:bg-amber-50 hover:border-amber-300 border border-slate-200 rounded-xl text-center transition group flex flex-col items-center justify-center gap-1 shadow-sm">
+                            <i class="fa-solid fa-shield-virus text-amber-500 text-base group-hover:scale-110 transition-transform"></i>
+                            <span class="text-xs font-medium text-slate-700">แก้ไวรัส</span>
+                        </button>
+                        <button type="button" onclick="addQuickPreset('สมัครเมล')" class="p-2.5 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 border border-slate-200 rounded-xl text-center transition group flex flex-col items-center justify-center gap-1 shadow-sm">
+                            <i class="fa-solid fa-envelope text-blue-500 text-base group-hover:scale-110 transition-transform"></i>
+                            <span class="text-xs font-medium text-slate-700">สมัครเมล</span>
+                        </button>
+                        <button type="button" onclick="addQuickPreset('สมัครไอดี')" class="p-2.5 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 border border-slate-200 rounded-xl text-center transition group flex flex-col items-center justify-center gap-1 shadow-sm">
+                            <i class="fa-solid fa-id-card text-indigo-500 text-base group-hover:scale-110 transition-transform"></i>
+                            <span class="text-xs font-medium text-slate-700">สมัครไอดี</span>
+                        </button>
+                        <button type="button" onclick="addQuickPreset('สมัครเฟส')" class="p-2.5 bg-slate-50 hover:bg-sky-50 hover:border-sky-300 border border-slate-200 rounded-xl text-center transition group flex flex-col items-center justify-center gap-1 shadow-sm">
+                            <i class="fa-brands fa-facebook text-sky-600 text-base group-hover:scale-110 transition-transform"></i>
+                            <span class="text-xs font-medium text-slate-700">สมัครเฟส</span>
+                        </button>
+                        <button type="button" onclick="addQuickPreset('สมัครไลน์')" class="p-2.5 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 border border-slate-200 rounded-xl text-center transition group flex flex-col items-center justify-center gap-1 shadow-sm">
+                            <i class="fa-brands fa-line text-emerald-500 text-base group-hover:scale-110 transition-transform"></i>
+                            <span class="text-xs font-medium text-slate-700">สมัครไลน์</span>
+                        </button>
+                        <button type="button" onclick="addQuickPreset('แก้โปรแกรม')" class="p-2.5 bg-slate-50 hover:bg-purple-50 hover:border-purple-300 border border-slate-200 rounded-xl text-center transition group flex flex-col items-center justify-center gap-1 shadow-sm">
+                            <i class="fa-solid fa-code text-purple-500 text-base group-hover:scale-110 transition-transform"></i>
+                            <span class="text-xs font-medium text-slate-700">แก้โปรแกรม</span>
+                        </button>
+                        <button type="button" onclick="addQuickPreset('ย้ายข้อมูล')" class="p-2.5 bg-slate-50 hover:bg-teal-50 hover:border-teal-300 border border-slate-200 rounded-xl text-center transition group flex flex-col items-center justify-center gap-1 shadow-sm">
+                            <i class="fa-solid fa-right-left text-teal-600 text-base group-hover:scale-110 transition-transform"></i>
+                            <span class="text-xs font-medium text-slate-700">ย้ายข้อมูล</span>
+                        </button>
+
+                        <!-- ฟิล์ม & ติดกระจก -->
+                        <button type="button" onclick="addQuickPreset('ฟิล์มกระจกนิรภัยFocus')" class="p-2.5 bg-slate-50 hover:bg-cyan-50 hover:border-cyan-300 border border-slate-200 rounded-xl text-center transition group flex flex-col items-center justify-center gap-1 shadow-sm">
+                            <i class="fa-solid fa-shield text-cyan-600 text-base group-hover:scale-110 transition-transform"></i>
+                            <span class="text-xs font-medium text-slate-700">ฟิล์มกระจกFocus</span>
+                        </button>
+                        <button type="button" onclick="addQuickPreset('ฟิล์มกระจกนิรภัย')" class="p-2.5 bg-slate-50 hover:bg-cyan-50 hover:border-cyan-300 border border-slate-200 rounded-xl text-center transition group flex flex-col items-center justify-center gap-1 shadow-sm">
+                            <i class="fa-solid fa-mobile-screen-button text-cyan-500 text-base group-hover:scale-110 transition-transform"></i>
+                            <span class="text-xs font-medium text-slate-700">ฟิล์มกระจกนิรภัย</span>
+                        </button>
+                        <button type="button" onclick="addQuickPreset('ฟิล์มไฮโดรเจลFocus')" class="p-2.5 bg-slate-50 hover:bg-blue-50 hover:border-blue-300 border border-slate-200 rounded-xl text-center transition group flex flex-col items-center justify-center gap-1 shadow-sm">
+                            <i class="fa-solid fa-droplet text-blue-500 text-base group-hover:scale-110 transition-transform"></i>
+                            <span class="text-xs font-medium text-slate-700">ฟิล์มไฮโดรเจลFocus</span>
+                        </button>
+
+                        <!-- งานซ่อมฮาร์ดแวร์ / เปลี่ยนอะไหล่ -->
+                        <button type="button" onclick="addQuickPreset('เปลี่ยนแบตเตอรี่')" class="p-2.5 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 border border-slate-200 rounded-xl text-center transition group flex flex-col items-center justify-center gap-1 shadow-sm">
+                            <i class="fa-solid fa-battery-three-quarters text-emerald-600 text-base group-hover:scale-110 transition-transform"></i>
+                            <span class="text-xs font-medium text-slate-700">เปลี่ยนแบตเตอรี่</span>
+                        </button>
+                        <button type="button" onclick="addQuickPreset('เปลี่ยนจอ')" class="p-2.5 bg-slate-50 hover:bg-sky-50 hover:border-sky-300 border border-slate-200 rounded-xl text-center transition group flex flex-col items-center justify-center gap-1 shadow-sm">
+                            <i class="fa-solid fa-mobile-screen text-sky-500 text-base group-hover:scale-110 transition-transform"></i>
+                            <span class="text-xs font-medium text-slate-700">เปลี่ยนจอ</span>
+                        </button>
+                        <button type="button" onclick="addQuickPreset('ชาร์จไม่เข้า')" class="p-2.5 bg-slate-50 hover:bg-amber-50 hover:border-amber-300 border border-slate-200 rounded-xl text-center transition group flex flex-col items-center justify-center gap-1 shadow-sm">
+                            <i class="fa-solid fa-plug-circle-bolt text-amber-600 text-base group-hover:scale-110 transition-transform"></i>
+                            <span class="text-xs font-medium text-slate-700">ชาร์จไม่เข้า</span>
+                        </button>
+                        <button type="button" onclick="addQuickPreset('เปิดไม่ติด')" class="p-2.5 bg-slate-50 hover:bg-rose-50 hover:border-rose-300 border border-slate-200 rounded-xl text-center transition group flex flex-col items-center justify-center gap-1 shadow-sm">
+                            <i class="fa-solid fa-power-off text-rose-500 text-base group-hover:scale-110 transition-transform"></i>
+                            <span class="text-xs font-medium text-slate-700">เปิดไม่ติด</span>
+                        </button>
+
+                        <!-- ปุ่มกดต่างๆ -->
+                        <button type="button" onclick="addQuickPreset('ปุ่มออนเครื่อง')" class="p-2.5 bg-slate-50 hover:bg-orange-50 hover:border-orange-300 border border-slate-200 rounded-xl text-center transition group flex flex-col items-center justify-center gap-1 shadow-sm">
+                            <i class="fa-solid fa-toggle-on text-orange-500 text-base group-hover:scale-110 transition-transform"></i>
+                            <span class="text-xs font-medium text-slate-700">ปุ่มออนเครื่อง</span>
+                        </button>
+                        <button type="button" onclick="addQuickPreset('ปุ่มลดเสียง')" class="p-2.5 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 border border-slate-200 rounded-xl text-center transition group flex flex-col items-center justify-center gap-1 shadow-sm">
+                            <i class="fa-solid fa-volume-low text-slate-600 text-base group-hover:scale-110 transition-transform"></i>
+                            <span class="text-xs font-medium text-slate-700">ปุ่มลดเสียง</span>
+                        </button>
+                        <button type="button" onclick="addQuickPreset('ปุ่มเพิ่มเสียง')" class="p-2.5 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 border border-slate-200 rounded-xl text-center transition group flex flex-col items-center justify-center gap-1 shadow-sm">
+                            <i class="fa-solid fa-volume-high text-slate-600 text-base group-hover:scale-110 transition-transform"></i>
+                            <span class="text-xs font-medium text-slate-700">ปุ่มเพิ่มเสียง</span>
+                        </button>
+                        <button type="button" onclick="addQuickPreset('ปุ่มเพิ่มและลดเสียง')" class="p-2.5 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 border border-slate-200 rounded-xl text-center transition group flex flex-col items-center justify-center gap-1 shadow-sm">
+                            <i class="fa-solid fa-sliders text-slate-600 text-base group-hover:scale-110 transition-transform"></i>
+                            <span class="text-xs font-medium text-slate-700">ปุ่มเพิ่ม-ลดเสียง</span>
+                        </button>
+
+                        <!-- บริการตรวจเช็ค -->
+                        <button type="button" onclick="addQuickPreset('เช็คเครื่องโทรแจ้งอาการ')" class="p-2.5 bg-slate-50 hover:bg-violet-50 hover:border-violet-300 border border-slate-200 rounded-xl text-center transition group flex flex-col items-center justify-center gap-1 shadow-sm">
+                            <i class="fa-solid fa-phone-volume text-violet-600 text-base group-hover:scale-110 transition-transform"></i>
+                            <span class="text-xs font-medium text-slate-700">เช็คเครื่องโทรแจ้ง</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- FORM INPUTS -->
+                <form id="form-repair" onsubmit="handleSaveRepair(event)" class="space-y-6">
+
+                    <!-- Customer & Device Optional Info Box -->
+                    <div class="bg-slate-50/70 p-4 sm:p-5 rounded-xl border border-slate-200/80 space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+                            <span class="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-2">
+                                <i class="fa-solid fa-user-gear text-slate-500"></i>
+                                ข้อมูลลูกค้าและอุปกรณ์ <span class="text-slate-400 font-normal lowercase">(ไม่ใส่ก็ได้ - โหมดด่วน)</span>
+                            </span>
+                            <span class="text-xs text-slate-400 italic"><i class="fa-solid fa-circle-info mr-1"></i>พร้อมออกสลิปทันที</span>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">ชื่อลูกค้า</label>
+                                <input type="text" id="input-customer-name" placeholder="เช่น คุณสมชาย (เว้นว่างได้)" class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">เบอร์โทรศัพท์</label>
+                                <input type="tel" id="input-customer-phone" placeholder="08X-XXX-XXXX (เว้นว่างได้)" class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">ยี่ห้อ / รุ่น มือถือ</label>
+                                <input type="text" id="input-device-model" placeholder="เช่น iPhone 13, Samsung S23" class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition">
+                            </div>
+                        </div>
+
+                        <!-- NEW FIELD: CUSTOMER ACCESSORIES -->
+                        <div class="space-y-2 border-t border-slate-200/60 pt-3">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                                <label class="block text-xs font-medium text-slate-700 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-boxes-packing text-brand-500"></i>
+                                    อุปกรณ์ของลูกค้า (อุปกรณ์ที่ติดมาด้วย)
+                                </label>
+                                <div class="flex flex-wrap gap-1 text-[11px] text-slate-500">
+                                    <span class="font-medium text-slate-400">ตัวช่วยเลือกด่วน:</span>
+                                    <button type="button" onclick="appendAccessory('ตัวเครื่องอย่างเดียว')" class="px-2 py-0.5 bg-slate-200/80 hover:bg-brand-100 hover:text-brand-700 rounded transition">ตัวเครื่องอย่างเดียว</button>
+                                    <button type="button" onclick="appendAccessory('เคส')" class="px-2 py-0.5 bg-slate-200/80 hover:bg-brand-100 hover:text-brand-700 rounded transition">+ เคส</button>
+                                    <button type="button" onclick="appendAccessory('ซิมการ์ด')" class="px-2 py-0.5 bg-slate-200/80 hover:bg-brand-100 hover:text-brand-700 rounded transition">+ SIM</button>
+                                    <button type="button" onclick="appendAccessory('เมมโมรี่การ์ด')" class="px-2 py-0.5 bg-slate-200/80 hover:bg-brand-100 hover:text-brand-700 rounded transition">+ MicroSD</button>
+                                    <button type="button" onclick="appendAccessory('สายชาร์จ')" class="px-2 py-0.5 bg-slate-200/80 hover:bg-brand-100 hover:text-brand-700 rounded transition">+ สายชาร์จ</button>
+                                    <button type="button" onclick="appendAccessory('หัวชาร์จ')" class="px-2 py-0.5 bg-slate-200/80 hover:bg-brand-100 hover:text-brand-700 rounded transition">+ หัวชาร์จ</button>
+                                </div>
+                            </div>
+                            <input type="text" id="input-customer-accessories" placeholder="เช่น ตัวเครื่อง + เคส + SIM + MicroSD 32GB + สายชาร์จ (เว้นว่างได้)" class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">อาการเสีย / รายละเอียดเพิ่มเติม</label>
+                            <input type="text" id="input-symptom" placeholder="เช่น จอแตกเปิดไม่ติด, เครื่องติดรหัสล็อกหน้าจอ" class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition">
+                        </div>
+                    </div>
+
+                    <!-- REPAIR ITEMS TABLE -->
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <label class="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+                                <i class="fa-solid fa-list-ol text-brand-500"></i>
+                                รายการงานซ่อม / อะไหล่ / ค่าบริการ
+                            </label>
+                            <button type="button" onclick="addCustomItemRow()" class="text-xs text-brand-600 font-semibold hover:text-brand-700 flex items-center gap-1">
+                                <i class="fa-solid fa-plus-circle"></i> เพิ่มรายการ custom
+                            </button>
+                        </div>
+
+                        <div class="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                            <table class="w-full text-left border-collapse text-sm">
+                                <thead>
+                                    <tr class="bg-slate-100/80 text-slate-600 font-medium border-b border-slate-200 text-xs uppercase">
+                                        <th class="p-3">รายละเอียดงานซ่อม</th>
+                                        <th class="p-3 w-32 text-right">ราคา (บาท)</th>
+                                        <th class="p-3 w-12 text-center">จัดการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="repair-items-table-body" class="divide-y divide-slate-100 bg-white">
+                                    <!-- Dynamic Rows Rendered Here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- FINANCIAL SUMMARY & DEPOSIT -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200/80">
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">เงินมัดจำ (ถ้ามี)</label>
+                                <div class="relative">
+                                    <input type="number" id="input-deposit" min="0" value="0" oninput="calculateTotals()" class="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-brand-500 transition">
+                                    <span class="absolute left-3 top-2.5 text-slate-400 text-xs font-bold">฿</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">สถานะงานซ่อม</label>
+                                <select id="input-status" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-800 focus:ring-2 focus:ring-brand-500 transition">
+                                    <option value="รับเครื่องแล้ว">🟡 รับเครื่องแล้ว (รอซ่อม)</option>
+                                    <option value="กำลังซ่อม">🔵 กำลังซ่อม</option>
+                                    <option value="รออะไหล่">🟠 รออะไหล่</option>
+                                    <option value="ซ่อมเสร็จแล้ว">🟢 ซ่อมเสร็จแล้ว (รอรับ)</option>
+                                    <option value="ส่งคืนลูกค้าแล้ว">✅ ส่งคืนลูกค้าแล้ว (ปิดงาน)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 flex flex-col justify-between space-y-2">
+                            <div class="space-y-1">
+                                <div class="flex justify-between text-xs text-slate-500">
+                                    <span>รวมราคาสินค้า/บริการ:</span>
+                                    <span id="summary-subtotal" class="font-medium text-slate-700">0.00 บาท</span>
+                                </div>
+                                <div class="flex justify-between text-xs text-slate-500">
+                                    <span>หัก เงินมัดจำ:</span>
+                                    <span id="summary-deposit" class="font-medium text-rose-500">-0.00 บาท</span>
+                                </div>
+                                <div class="pt-2 border-t border-slate-100 flex justify-between items-baseline">
+                                    <span class="text-sm font-bold text-slate-800">ยอดชำระคงเหลือ:</span>
+                                    <span id="summary-total" class="text-xl font-extrabold text-brand-600">0.00 บาท</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SUBMIT BUTTONS -->
+                    <div class="flex flex-col sm:flex-row gap-3 pt-2">
+                        <button type="submit" name="action" value="save_only" class="flex-1 py-3 px-4 bg-slate-800 hover:bg-slate-900 text-white font-medium rounded-xl transition shadow-md flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-floppy-disk"></i>
+                            <span>บันทึกข้อมูลอย่างเดียว</span>
+                        </button>
+                        <button type="submit" name="action" value="save_and_print" class="flex-1 py-3 px-4 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-xl transition shadow-md shadow-brand-500/20 flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-print"></i>
+                            <span>บันทึกและพิมพ์สลิปทันที</span>
+                        </button>
+                    </div>
+
+                </form>
+            </div>
+
+            <!-- TAB 4: PAY INSTALLMENT (เมนูรับชำระค่างวดมือถือ & ออกใบเสร็จ) -->
+            <div id="tab-pay-installment" class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 sm:p-8 space-y-6 hidden">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-2">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-receipt text-emerald-600"></i>
+                            ใบเสร็จ จ่ายค่างวดมือถือ & สินเชื่อ
+                        </h2>
+                        <p class="text-xs text-slate-500 mt-0.5">บันทึกชำระค่างวด พิมพ์ใบเสร็จ SG Capital, KBJ Capital และค่างวดมือถือทั่วไป</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-medium text-slate-500">เลขที่ใบเสร็จ:</span>
+                        <span id="pay-receipt-id" class="text-xs font-mono font-bold bg-emerald-50 text-emerald-700 px-3 py-1 rounded-lg border border-emerald-200">PAY-XXXX</span>
+                    </div>
+                </div>
+
+                <!-- FORM RECEIVE INSTALLMENT -->
+                <form id="form-pay-installment" onsubmit="handleSaveInstallmentPayment(event)" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        
+                        <!-- Customer & Contract Info -->
+                        <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 space-y-4">
+                            <div class="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-2 pb-2 border-b border-slate-200">
+                                <i class="fa-solid fa-id-card text-emerald-600"></i>
+                                ข้อมูลผู้บริการสินเชื่อและผู้ผ่อนชำระ
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">ประเภทสินเชื่อ / ผู้ให้บริการ <span class="text-rose-500">*</span></label>
+                                <select id="pay-provider" required class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-bold text-emerald-800 focus:ring-2 focus:ring-emerald-500 transition">
+                                    <option value="SG Capital (เอสจี แคปปิตอล)">SG Capital (เอสจี แคปปิตอล)</option>
+                                    <option value="KBJ Capital (เคบีเจ แคปปิตอล)">KBJ Capital (เคบีเจ แคปปิตอล)</option>
+                                    <option value="ค่างวดผ่อนมือถือ (ร้านค้า)">ค่างวดผ่อนมือถือ (ร้านค้า)</option>
+                                    <option value="สินเชื่ออื่นๆ">สินเชื่ออื่นๆ</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">เลขที่สัญญา / เลขบัตรประชาชน / Ref.1 <span class="text-slate-400 font-normal">(เว้นว่างได้)</span></label>
+                                <input type="text" id="pay-contract-no" placeholder="เช่น CTR-2024-001 หรือ เลขบัตรประชาชน (เว้นว่างได้)" class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-emerald-500 transition">
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600 mb-1">ชื่อ-นามสกุล ลูกค้า <span class="text-slate-400 font-normal">(เว้นว่างได้)</span></label>
+                                    <input type="text" id="pay-customer-name" placeholder="คุณสมชาย ใจดี (เว้นว่างได้)" class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-medium focus:ring-2 focus:ring-emerald-500 transition">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600 mb-1">เบอร์โทรศัพท์</label>
+                                    <input type="tel" id="pay-customer-phone" placeholder="08X-XXX-XXXX" class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-medium focus:ring-2 focus:ring-emerald-500 transition">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">ยี่ห้อ / รุ่น มือถือที่ผ่อน</label>
+                                <input type="text" id="pay-device-model" placeholder="เช่น iPhone 15 Pro Max, Samsung A55" class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-medium focus:ring-2 focus:ring-emerald-500 transition">
+                            </div>
+                        </div>
+
+                        <!-- Financials & Payment Method -->
+                        <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 space-y-4 flex flex-col justify-between">
+                            <div class="space-y-4">
+                                <div class="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-2 pb-2 border-b border-slate-200">
+                                    <i class="fa-solid fa-coins text-emerald-600"></i>
+                                    รายละเอียดการชำระเงิน
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600 mb-1">จำนวนเงินค่างวด (บาท) <span class="text-rose-500">*</span></label>
+                                    <div class="relative">
+                                        <input type="number" id="pay-amount" min="1" step="any" required value="1500" oninput="calculatePaySummary()" class="w-full pl-8 pr-3 py-2.5 bg-white border border-slate-300 rounded-xl text-base font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 transition">
+                                        <span class="absolute left-3 top-3 text-slate-400 text-sm font-bold">฿</span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-600 mb-1">ค่าธรรมเนียม / ค่าปรับล่าช้า / ค่าบริการเพิ่มเติม (บาท)</label>
+                                    <div class="relative">
+                                        <input type="number" id="pay-penalty-fee" min="0" step="any" value="0" oninput="calculatePaySummary()" class="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500 transition">
+                                        <span class="absolute left-3 top-2.5 text-slate-400 text-xs font-bold">฿</span>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">ช่องทางชำระเงิน</label>
+                                        <select id="pay-method" class="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-sm font-medium focus:ring-2 focus:ring-emerald-500 transition">
+                                            <option value="เงินสด">💵 เงินสด (Cash)</option>
+                                            <option value="โอนเงินผ่านธนาคาร">📱 โอนเงิน (PromptPay/Bank)</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">ยอดคงเหลือหลังชำระ (ถ้ามี)</label>
+                                        <input type="number" id="pay-remaining-balance" placeholder="0.00" class="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-sm font-medium focus:ring-2 focus:ring-emerald-500 transition">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Total Display Card -->
+                            <div class="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-4 rounded-xl shadow-md space-y-1">
+                                <span class="text-xs uppercase tracking-wider opacity-90 block">ยอดชำระสุทธิรวมทั้งสิ้น</span>
+                                <div class="flex justify-between items-baseline">
+                                    <span class="text-xs opacity-75">รวมค่างวด + ค่าธรรมเนียม</span>
+                                    <span id="pay-grand-total-display" class="text-2xl font-extrabold tracking-tight">1,500.00 บาท</span>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- ACTION BUTTONS -->
+                    <div class="flex flex-col sm:flex-row gap-3 pt-2">
+                        <button type="submit" name="pay_action" value="save_only" class="flex-1 py-3 px-4 bg-slate-800 hover:bg-slate-900 text-white font-medium rounded-xl transition shadow-md flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-floppy-disk"></i>
+                            <span>บันทึกชำระเงินอย่างเดียว</span>
+                        </button>
+                        <button type="submit" name="pay_action" value="save_and_print" class="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-print"></i>
+                            <span>บันทึกและพิมพ์ใบเสร็จค่างวด</span>
+                        </button>
+                    </div>
+                </form>
+
+                <!-- HISTORY TABLE FOR PAYMENTS -->
+                <div class="pt-6 border-t border-slate-200 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-clock-rotate-left text-slate-500"></i>
+                            ประวัติการรับชำระค่างวดล่าสุด
+                        </h3>
+                        <div class="w-64 relative">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                            <input type="text" id="search-pay-input" onkeyup="filterInstallmentPayments()" placeholder="ค้นหา สินเชื่อ/สัญญา/ชื่อ..." class="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white transition">
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr class="bg-slate-100/80 text-slate-600 font-medium border-b border-slate-200 text-xs uppercase tracking-wider">
+                                    <th class="p-3">เลขที่ใบเสร็จ / วันที่</th>
+                                    <th class="p-3">สินค้า / ผู้ให้บริการ</th>
+                                    <th class="p-3">สัญญา / ลูกค้า</th>
+                                    <th class="p-3 text-right">ยอดรวมชำระ</th>
+                                    <th class="p-3 text-center">ช่องทาง</th>
+                                    <th class="p-3 text-center">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="installment-pay-table-body" class="divide-y divide-slate-100 bg-white">
+                                <!-- Rows dynamic -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: INSTALLMENT CALCULATOR (เมนูคำนวณค่างวดมือถือ) -->
+            <div id="tab-installment" class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 sm:p-8 space-y-6 hidden">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-2">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-calculator text-amber-500"></i>
+                            คำนวณยอดผ่อน / งวดมือถือ & ค่าบริการ
+                        </h2>
+                        <p class="text-xs text-slate-500 mt-0.5">คำนวณค่างวดรายเดือนและรวมค่าบริการอัตโนมัติ</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Input Section -->
+                    <div class="space-y-4 bg-slate-50 p-5 rounded-2xl border border-slate-200/80">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">ราคามือถือ / ยอดจัดผ่อน (บาท)</label>
+                            <input type="number" id="inst-device-price" value="10000" oninput="calculateInstallment()" class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-amber-500 transition">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">เงินดาวน์ (บาท)</label>
+                            <input type="number" id="inst-down-payment" value="2000" oninput="calculateInstallment()" class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-amber-500 transition">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">จำนวนงวด (เดือน)</label>
+                            <select id="inst-months" onchange="calculateInstallment()" class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-amber-500 transition">
+                                <option value="3">3 เดือน</option>
+                                <option value="6" selected>6 เดือน</option>
+                                <option value="10">10 เดือน</option>
+                                <option value="12">12 เดือน</option>
+                                <option value="18">18 เดือน</option>
+                                <option value="24">24 เดือน</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">อัตราดอกเบี้ยต่อเดือน (%)</label>
+                            <input type="number" id="inst-interest-rate" step="0.1" value="1.5" oninput="calculateInstallment()" class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-amber-500 transition">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">ค่าบริการ / ค่าธรรมเนียมเพิ่มเติม (บาท)</label>
+                            <input type="number" id="inst-service-fee" value="300" oninput="calculateInstallment()" class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-amber-500 transition">
+                        </div>
+                    </div>
+
+                    <!-- Summary Display Section -->
+                    <div class="bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl p-6 text-white flex flex-col justify-between shadow-lg shadow-amber-500/20">
+                        <div>
+                            <h3 class="text-sm font-medium uppercase tracking-wider opacity-90 mb-4">สรุปการคำนวณค่างวด</h3>
+
+                            <div class="space-y-3 text-sm">
+                                <div class="flex justify-between pb-2 border-b border-white/20">
+                                    <span class="opacity-90">ยอดคงเหลือจัดผ่อน:</span>
+                                    <span id="res-loan-principal" class="font-bold">0.00 บาท</span>
+                                </div>
+                                <div class="flex justify-between pb-2 border-b border-white/20">
+                                    <span class="opacity-90">ดอกเบี้ยรวมทั้งหมด:</span>
+                                    <span id="res-total-interest" class="font-bold">0.00 บาท</span>
+                                </div>
+                                <div class="flex justify-between pb-2 border-b border-white/20">
+                                    <span class="opacity-90">ยอดรวมจัดผ่อน + ดอกเบี้ย:</span>
+                                    <span id="res-total-loan" class="font-bold">0.00 บาท</span>
+                                </div>
+                                <div class="flex justify-between pb-2 border-b border-white/20">
+                                    <span class="opacity-90">ค่าบริการ / ธรรมเนียมเพิ่มเติม:</span>
+                                    <span id="res-service-fee" class="font-bold">0.00 บาท</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 pt-4 border-t border-white/30 space-y-3">
+                            <div>
+                                <span class="text-xs uppercase tracking-wide opacity-80 block">ผ่อนชำระต่อเดือน (งวดละ)</span>
+                                <span id="res-monthly-payment" class="text-3xl font-extrabold tracking-tight">0.00 บาท</span>
+                            </div>
+                            <div class="bg-white/10 p-3 rounded-xl border border-white/20 text-xs flex justify-between items-center">
+                                <span>ยอดสุทธิรวมทั้งหมดตลอดสัญญา:</span>
+                                <span id="res-grand-total" class="font-bold text-sm">0.00 บาท</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: REPAIR LIST DASHBOARD -->
+            <div id="tab-list" class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 sm:p-8 space-y-6 hidden">
+                
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-rectangle-list text-brand-500"></i>
+                            ประวัติและรายการงานซ่อมทั้งหมด
+                        </h2>
+                        <p class="text-xs text-slate-500 mt-0.5">ค้นหา ตรวจสอบสถานะ และพิมพ์สลิปซ้ำ (Reprint)</p>
+                    </div>
+                </div>
+
+                <!-- SEARCH & FILTER BAR -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="sm:col-span-2 relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-sm"></i>
+                        <input type="text" id="search-input" onkeyup="filterRepairList()" placeholder="ค้นหาด้วย เลขใบซ่อม / ชื่อลูกค้า / เบอร์โทร / รุ่นมือถือ / อุปกรณ์ที่ติดมา..." class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:bg-white transition">
+                    </div>
+                    <div>
+                        <select id="filter-status" onchange="filterRepairList()" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:ring-2 focus:ring-brand-500 transition">
+                            <option value="ALL">-- ทุกสถานะ --</option>
+                            <option value="รับเครื่องแล้ว">🟡 รับเครื่องแล้ว</option>
+                            <option value="กำลังซ่อม">🔵 กำลังซ่อม</option>
+                            <option value="รออะไหล่">🟠 รออะไหล่</option>
+                            <option value="ซ่อมเสร็จแล้ว">🟢 ซ่อมเสร็จแล้ว</option>
+                            <option value="ส่งคืนลูกค้าแล้ว">✅ ส่งคืนลูกค้าแล้ว</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- TABLE LIST -->
+                <div class="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-slate-100/80 text-slate-600 font-medium border-b border-slate-200 text-xs uppercase tracking-wider">
+                                <th class="p-3.5">เลขใบซ่อม / วันที่</th>
+                                <th class="p-3.5">ข้อมูลลูกค้า / รุ่นมือถือ</th>
+                                <th class="p-3.5">อาการ / รายการซ่อม / อุปกรณ์ที่ติดมา</th>
+                                <th class="p-3.5 text-right">ยอดคงเหลือ</th>
+                                <th class="p-3.5 text-center">สถานะ</th>
+                                <th class="p-3.5 text-center">การจัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="repair-list-table-body" class="divide-y divide-slate-100 bg-white">
+                            <!-- Rows injected by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+
+        </main>
+    </div>
+
+    <!-- MODAL: RECEIPT PRINT PREVIEW -->
+    <div id="modal-print-preview" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-slate-100">
+            <!-- Modal Header -->
+            <div class="p-4 bg-slate-900 text-white flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-print text-brand-500"></i>
+                    <h3 class="font-bold text-base">ตัวอย่างก่อนพิมพ์สลิป / ใบเสร็จ</h3>
+                </div>
+                <button onclick="closeModal('modal-print-preview')" class="text-slate-400 hover:text-white text-xl">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Modal Controls for Paper Size Selection -->
+            <div class="bg-slate-100 px-6 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center space-x-2">
+                    <label class="text-xs font-bold text-slate-700">เลือกขนาดกระดาษ:</label>
+                    <select id="paper-size-select" onchange="changePaperSize(this.value)" class="text-xs px-3 py-1.5 bg-white border border-slate-300 rounded-lg font-medium text-slate-800 shadow-sm focus:ring-2 focus:ring-brand-500">
+                        <option value="58mm">เครื่องพิมพ์ความร้อน 58mm (Thermal)</option>
+                        <option value="80mm" selected>เครื่องพิมพ์ความร้อน 80mm (Thermal)</option>
+                        <option value="a4">กระดาษ A4 (A4 Document)</option>
+                    </select>
+                </div>
+                <div class="text-xs text-slate-500">
+                    <i class="fa-solid fa-lightbulb text-amber-500 mr-1"></i>ปรับกระดาษให้ตรงกับเครื่องพิมพ์ของคุณ
+                </div>
+            </div>
+
+            <!-- Preview Container -->
+            <div class="p-6 overflow-y-auto bg-slate-200/50 flex-1 flex justify-center">
+                <!-- Dynamic Print Paper Container -->
+                <div id="receipt-paper-wrapper" class="bg-white shadow-md border border-slate-300 transition-all duration-200 text-slate-900 paper-80mm">
+                    
+                    <!-- Content Generated Dynamically -->
+                    <div id="receipt-content-preview">
+                        <!-- Filled by JavaScript -->
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Modal Footer Actions -->
+            <div class="p-4 bg-white border-t border-slate-200 flex items-center justify-end space-x-3">
+                <button onclick="closeModal('modal-print-preview')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl text-sm transition">
+                    ปิดหน้าต่าง
+                </button>
+                <button onclick="triggerActualPrint()" class="px-5 py-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-xl text-sm transition shadow-md shadow-brand-500/20 flex items-center space-x-2">
+                    <i class="fa-solid fa-print"></i>
+                    <span>สั่งพิมพ์ / พิมพ์สลิป</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: SHOP SETTINGS & QR CODE UPLOAD -->
+    <div id="modal-shop-settings" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100">
+            <div class="p-4 bg-slate-900 text-white flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-store text-brand-500"></i>
+                    <h3 class="font-bold text-base">ตั้งค่าร้านค้า & QR Code รับเงิน</h3>
+                </div>
+                <button onclick="closeModal('modal-shop-settings')" class="text-slate-400 hover:text-white text-xl">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form onsubmit="saveShopSettings(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">ชื่อร้านค้า / หัวสลิป</label>
+                    <input type="text" id="setting-shop-name" required placeholder="เช่น ร้าน มือถือช่างเอ Service" class="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-sm font-medium focus:ring-2 focus:ring-brand-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">เบอร์โทรศัพท์ร้าน / ID Line</label>
+                    <input type="text" id="setting-shop-phone" placeholder="เช่น 081-234-5678" class="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-sm font-medium focus:ring-2 focus:ring-brand-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">ที่อยู่ร้าน (สั้นๆ)</label>
+                    <input type="text" id="setting-shop-address" placeholder="เช่น ตลาดนัดสายใต้ใหม่ ล็อก A12" class="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-sm font-medium focus:ring-2 focus:ring-brand-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">ข้อความท้ายใบรับซ่อม / เงื่อนไข</label>
+                    <textarea id="setting-shop-footer" rows="2" class="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-500" placeholder="เช่น รับประกันงานซ่อม 30 วัน / ไม่รับประกันเครื่องโดนน้ำ"></textarea>
+                </div>
+
+                <!-- QR CODE UPLOAD AREA -->
+                <div class="border-t border-slate-100 pt-3">
+                    <label class="block text-xs font-bold text-slate-700 mb-2">อัปโหลดภาพ QR Code รับเงิน (PromptPay/Bank)</label>
+                    <div class="flex items-center space-x-4">
+                        <div class="w-24 h-24 bg-slate-100 rounded-xl border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden relative group">
+                            <img id="qr-preview-img" src="" alt="QR" class="w-full h-full object-contain hidden">
+                            <i id="qr-placeholder-icon" class="fa-solid fa-qrcode text-3xl text-slate-400"></i>
+                        </div>
+                        <div class="flex-1 space-y-2">
+                            <input type="file" id="input-qr-file" accept="image/*" onchange="handleQRUpload(event)" class="hidden">
+                            <button type="button" onclick="document.getElementById('input-qr-file').click()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-medium transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-upload"></i> เลือกรูป QR Code
+                            </button>
+                            <button type="button" onclick="clearQRCode()" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-xs font-medium transition block">
+                                ลบรูป QR
+                            </button>
+                            <p class="text-[10px] text-slate-400">ภาพจะถูกบันทึกในเครื่อง (Offline LocalStorage)</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-slate-100 flex justify-end space-x-2">
+                    <button type="button" onclick="closeModal('modal-shop-settings')" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-sm font-medium">ยกเลิก</button>
+                    <button type="submit" class="px-5 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-sm font-semibold shadow-md">บันทึกการตั้งค่า</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- PURE PRINT TARGET AREA (Visible only during printing window.print) -->
+    <div id="print-area" class="hidden">
+        <!-- Rendered by JS during print -->
+    </div>
+
+
+    <!-- JAVASCRIPT APP LOGIC -->
+    <script>
+        // Storage Keys
+        const STORAGE_KEY_REPAIRS = 'MOBILE_POS_REPAIRS_V1';
+        const STORAGE_KEY_SHOP = 'MOBILE_POS_SHOP_CONFIG_V1';
+        const STORAGE_KEY_INSTALLMENT_PAYMENTS = 'MOBILE_POS_INSTALLMENT_PAYMENTS_V1';
+
+        // State Data
+        let repairsData = [];
+        let installmentPaymentsData = [];
+        let currentItems = [];
+        let activeTicketForPrint = null;
+        let activePrintType = 'repair'; // 'repair' or 'installment'
+
+        let shopConfig = {
+            name: 'ร้าน มือถือช่างมืออาชีพ (Mobile Repair)',
+            phone: '081-XXXX-XXX',
+            address: 'บริการซ่อมด่วน เปลี่ยนจอ เปลี่ยนแบต แก้โปรแกรม รับผ่อนมือถือ',
+            footer: 'ขอบคุณที่ใช้บริการ / รับประกันงานซ่อมตามเงื่อนไข 30 วัน',
+            qrImageData: '' // Base64 Image string
+        };
+
+        // Initialize App on DOM Load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadShopSettings();
+            loadRepairsData();
+            loadInstallmentPaymentsData();
+            resetRepairForm();
+            resetInstallmentPaymentForm();
+            updateDashboardStats();
+            calculateInstallment();
+        });
+
+        // Generate Ticket ID
+        function generateTicketID() {
+            const dateStr = new Date().toISOString().slice(2,10).replace(/-/g,'');
+            const random = Math.floor(1000 + Math.random() * 9000);
+            return `JOB-${dateStr}-${random}`;
+        }
+
+        // Generate Payment Receipt ID
+        function generatePaymentReceiptID() {
+            const dateStr = new Date().toISOString().slice(2,10).replace(/-/g,'');
+            const random = Math.floor(1000 + Math.random() * 9000);
+            return `PAY-${dateStr}-${random}`;
+        }
+
+        // Helper to append Quick Accessories Tag
+        function appendAccessory(item) {
+            const input = document.getElementById('input-customer-accessories');
+            let currentVal = input.value.trim();
+            if (!currentVal) {
+                input.value = item;
+            } else {
+                if (currentVal.includes(item)) return; // Prevent duplications
+                input.value = currentVal + ' + ' + item;
+            }
+        }
+
+        // Load Shop Settings
+        function loadShopSettings() {
+            const saved = localStorage.getItem(STORAGE_KEY_SHOP);
+            if (saved) {
+                try {
+                    shopConfig = { ...shopConfig, ...JSON.parse(saved) };
+                } catch(e) { console.error('Error loading shop settings', e); }
+            }
+            // Populate Form Fields
+            document.getElementById('setting-shop-name').value = shopConfig.name;
+            document.getElementById('setting-shop-phone').value = shopConfig.phone;
+            document.getElementById('setting-shop-address').value = shopConfig.address;
+            document.getElementById('setting-shop-footer').value = shopConfig.footer;
+            
+            if (shopConfig.qrImageData) {
+                document.getElementById('qr-preview-img').src = shopConfig.qrImageData;
+                document.getElementById('qr-preview-img').classList.remove('hidden');
+                document.getElementById('qr-placeholder-icon').classList.add('hidden');
+            }
+        }
+
+        // Save Shop Settings
+        function saveShopSettings(e) {
+            e.preventDefault();
+            shopConfig.name = document.getElementById('setting-shop-name').value.trim() || 'ร้านซ่อมมือถือ';
+            shopConfig.phone = document.getElementById('setting-shop-phone').value.trim();
+            shopConfig.address = document.getElementById('setting-shop-address').value.trim();
+            shopConfig.footer = document.getElementById('setting-shop-footer').value.trim();
+
+            localStorage.setItem(STORAGE_KEY_SHOP, JSON.stringify(shopConfig));
+            closeModal('modal-shop-settings');
+            alert('บันทึกการตั้งค่าร้านค้าเรียบร้อยแล้ว');
+        }
+
+        // Handle QR Code Image Upload & Convert to Base64
+        function handleQRUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                if (file.size > 2 * 1024 * 1024) {
+                    alert('ขนาดไฟล์ภาพใหญ่เกินไป กรุณาเลือกภาพขนาดไม่เกิน 2MB');
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    shopConfig.qrImageData = e.target.result;
+                    document.getElementById('qr-preview-img').src = shopConfig.qrImageData;
+                    document.getElementById('qr-preview-img').classList.remove('hidden');
+                    document.getElementById('qr-placeholder-icon').classList.add('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function clearQRCode() {
+            shopConfig.qrImageData = '';
+            document.getElementById('qr-preview-img').src = '';
+            document.getElementById('qr-preview-img').classList.add('hidden');
+            document.getElementById('qr-placeholder-icon').classList.remove('hidden');
+        }
+
+        // Load Repair Data
+        function loadRepairsData() {
+            const saved = localStorage.getItem(STORAGE_KEY_REPAIRS);
+            if (saved) {
+                try {
+                    repairsData = JSON.parse(saved);
+                } catch(e) { repairsData = []; }
+            }
+            renderRepairList();
+            updateDashboardStats();
+        }
+
+        // Load Installment Payments Data
+        function loadInstallmentPaymentsData() {
+            const saved = localStorage.getItem(STORAGE_KEY_INSTALLMENT_PAYMENTS);
+            if (saved) {
+                try {
+                    installmentPaymentsData = JSON.parse(saved);
+                } catch(e) { installmentPaymentsData = []; }
+            }
+            renderInstallmentPaymentsList();
+            updateDashboardStats();
+        }
+
+        // Save Repair Data to LocalStorage
+        function saveRepairsToStorage() {
+            localStorage.setItem(STORAGE_KEY_REPAIRS, JSON.stringify(repairsData));
+            updateDashboardStats();
+        }
+
+        // Save Installment Payments to LocalStorage
+        function saveInstallmentPaymentsToStorage() {
+            localStorage.setItem(STORAGE_KEY_INSTALLMENT_PAYMENTS, JSON.stringify(installmentPaymentsData));
+            updateDashboardStats();
+        }
+
+        // Reset Form to Initial State
+        function resetRepairForm() {
+            document.getElementById('form-repair').reset();
+            document.getElementById('repair-ticket-id').innerText = generateTicketID();
+            currentItems = [];
+            addCustomItemRow(); // Default 1 empty row
+            calculateTotals();
+        }
+
+        // Reset Installment Payment Form
+        function resetInstallmentPaymentForm() {
+            document.getElementById('form-pay-installment').reset();
+            document.getElementById('pay-receipt-id').innerText = generatePaymentReceiptID();
+            document.getElementById('pay-amount').value = 1500;
+            document.getElementById('pay-penalty-fee').value = 0;
+            calculatePaySummary();
+        }
+
+        // Quick Preset Add Function
+        function addQuickPreset(title) {
+            const emptyIndex = currentItems.findIndex(item => !item.title || item.title.trim() === '');
+            if (emptyIndex !== -1) {
+                currentItems[emptyIndex].title = title;
+            } else {
+                currentItems.push({ id: Date.now(), title: title, price: 0 });
+            }
+            renderItemsTable();
+        }
+
+        // Add Custom Empty Row
+        function addCustomItemRow() {
+            currentItems.push({ id: Date.now(), title: '', price: 0 });
+            renderItemsTable();
+        }
+
+        // Remove Item Row
+        function removeItemRow(index) {
+            if (currentItems.length > 1) {
+                currentItems.splice(index, 1);
+            } else {
+                currentItems = [{ id: Date.now(), title: '', price: 0 }];
+            }
+            renderItemsTable();
+        }
+
+        // Render Dynamic Items Table
+        function renderItemsTable() {
+            const tbody = document.getElementById('repair-items-table-body');
+            tbody.innerHTML = '';
+
+            currentItems.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50/50 transition';
+                tr.innerHTML = `
+                    <td class="p-2.5">
+                        <input type="text" value="${escapeHtml(item.title)}" onchange="updateItemTitle(${index}, this.value)" placeholder="ระบุรายการซ่อม / บริการ..." class="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:ring-2 focus:ring-brand-500 transition">
+                    </td>
+                    <td class="p-2.5 text-right">
+                        <input type="number" min="0" value="${item.price || ''}" oninput="updateItemPrice(${index}, this.value)" placeholder="0" class="w-full text-right px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold focus:bg-white focus:ring-2 focus:ring-brand-500 transition">
+                    </td>
+                    <td class="p-2.5 text-center">
+                        <button type="button" onclick="removeItemRow(${index})" class="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg transition">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            calculateTotals();
+        }
+
+        function updateItemTitle(index, val) {
+            currentItems[index].title = val;
+        }
+
+        function updateItemPrice(index, val) {
+            currentItems[index].price = parseFloat(val) || 0;
+            calculateTotals();
+        }
+
+        // Calculate Repair Totals
+        function calculateTotals() {
+            const subtotal = currentItems.reduce((sum, item) => sum + (parseFloat(item.price) || 0), 0);
+            const deposit = parseFloat(document.getElementById('input-deposit').value) || 0;
+            const grandTotal = Math.max(0, subtotal - deposit);
+
+            document.getElementById('summary-subtotal').innerText = `${subtotal.toLocaleString('th-TH', {minimumFractionDigits:2})} บาท`;
+            document.getElementById('summary-deposit').innerText = `-${deposit.toLocaleString('th-TH', {minimumFractionDigits:2})} บาท`;
+            document.getElementById('summary-total').innerText = `${grandTotal.toLocaleString('th-TH', {minimumFractionDigits:2})} บาท`;
+        }
+
+        // Calculate Pay Summary for Installment Form
+        function calculatePaySummary() {
+            const amount = parseFloat(document.getElementById('pay-amount').value) || 0;
+            const penalty = parseFloat(document.getElementById('pay-penalty-fee').value) || 0;
+            const total = amount + penalty;
+
+            document.getElementById('pay-grand-total-display').innerText = `${total.toLocaleString('th-TH', {minimumFractionDigits:2})} บาท`;
+        }
+
+        // Installment Calculation Logic
+        function calculateInstallment() {
+            const price = parseFloat(document.getElementById('inst-device-price').value) || 0;
+            const down = parseFloat(document.getElementById('inst-down-payment').value) || 0;
+            const months = parseInt(document.getElementById('inst-months').value) || 1;
+            const ratePercent = parseFloat(document.getElementById('inst-interest-rate').value) || 0;
+            const serviceFee = parseFloat(document.getElementById('inst-service-fee').value) || 0;
+
+            const principal = Math.max(0, price - down);
+            const monthlyInterestRate = ratePercent / 100;
+            const totalInterest = principal * monthlyInterestRate * months;
+            const totalLoanWithInterest = principal + totalInterest;
+
+            const monthlyPayment = months > 0 ? (totalLoanWithInterest / months) : 0;
+            const grandTotal = totalLoanWithInterest + down + serviceFee;
+
+            document.getElementById('res-loan-principal').innerText = `${principal.toLocaleString('th-TH', {minimumFractionDigits:2})} บาท`;
+            document.getElementById('res-total-interest').innerText = `${totalInterest.toLocaleString('th-TH', {minimumFractionDigits:2})} บาท`;
+            document.getElementById('res-total-loan').innerText = `${totalLoanWithInterest.toLocaleString('th-TH', {minimumFractionDigits:2})} บาท`;
+            document.getElementById('res-service-fee').innerText = `${serviceFee.toLocaleString('th-TH', {minimumFractionDigits:2})} บาท`;
+            document.getElementById('res-monthly-payment').innerText = `${monthlyPayment.toLocaleString('th-TH', {minimumFractionDigits:2})} บาท/เดือน`;
+            document.getElementById('res-grand-total').innerText = `${grandTotal.toLocaleString('th-TH', {minimumFractionDigits:2})} บาท`;
+        }
+
+        // Save Repair Entry Handler
+        function handleSaveRepair(e) {
+            e.preventDefault();
+            const submitter = e.submitter ? e.submitter.value : 'save_only';
+
+            const validItems = currentItems.filter(i => i.title.trim() !== '');
+            if (validItems.length === 0) {
+                alert('กรุณาระบุรายการซ่อมหรือเลือกเมนูด่วนอย่างน้อย 1 รายการ');
+                return;
+            }
+
+            const ticketId = document.getElementById('repair-ticket-id').innerText;
+            const customerName = document.getElementById('input-customer-name').value.trim() || 'ลูกค้าทั่วไป (Quick Mode)';
+            const customerPhone = document.getElementById('input-customer-phone').value.trim() || '-';
+            const deviceModel = document.getElementById('input-device-model').value.trim() || 'มือถือทั่วไป';
+            const accessories = document.getElementById('input-customer-accessories').value.trim() || 'ตัวเครื่องอย่างเดียว';
+            const symptom = document.getElementById('input-symptom').value.trim() || '-';
+            const deposit = parseFloat(document.getElementById('input-deposit').value) || 0;
+            const status = document.getElementById('input-status').value;
+
+            const subtotal = validItems.reduce((sum, i) => sum + (parseFloat(i.price) || 0), 0);
+            const total = Math.max(0, subtotal - deposit);
+
+            const repairData = {
+                id: ticketId,
+                date: new Date().toLocaleString('th-TH'),
+                timestamp: Date.now(),
+                customerName,
+                customerPhone,
+                deviceModel,
+                accessories,
+                symptom,
+                items: validItems,
+                subtotal,
+                deposit,
+                total,
+                status
+            };
+
+            repairsData.unshift(repairData);
+            saveRepairsToStorage();
+
+            activeTicketForPrint = repairData;
+            activePrintType = 'repair';
+
+            if (submitter === 'save_and_print') {
+                openPrintPreview(repairData, 'repair');
+            } else {
+                alert(`บันทึกข้อมูลสำเร็จ! เลขที่ใบซ่อม: ${ticketId}`);
+            }
+
+            resetRepairForm();
+            renderRepairList();
+        }
+
+        // Save Installment Payment Entry Handler
+        function handleSaveInstallmentPayment(e) {
+            e.preventDefault();
+            const submitter = e.submitter ? e.submitter.value : 'save_only';
+
+            const receiptId = document.getElementById('pay-receipt-id').innerText;
+            const provider = document.getElementById('pay-provider').value;
+            const contractNo = document.getElementById('pay-contract-no').value.trim() || '-';
+            const customerName = document.getElementById('pay-customer-name').value.trim() || 'ลูกค้าทั่วไป';
+            const customerPhone = document.getElementById('pay-customer-phone').value.trim() || '-';
+            const deviceModel = document.getElementById('pay-device-model').value.trim() || 'มือถือผ่อนชำระ';
+            const amount = parseFloat(document.getElementById('pay-amount').value) || 0;
+            const penaltyFee = parseFloat(document.getElementById('pay-penalty-fee').value) || 0;
+            const paymentMethod = document.getElementById('pay-method').value;
+            const remainingBalance = document.getElementById('pay-remaining-balance').value ? parseFloat(document.getElementById('pay-remaining-balance').value) : null;
+            const totalAmount = amount + penaltyFee;
+
+            if (amount <= 0) {
+                alert('กรุณากรอกจำนวนเงินค่างวดที่ถูกต้อง');
+                return;
+            }
+
+            const paymentData = {
+                id: receiptId,
+                provider,
+                contractNo,
+                customerName,
+                customerPhone,
+                deviceModel,
+                amount,
+                penaltyFee,
+                totalAmount,
+                paymentMethod,
+                remainingBalance,
+                date: new Date().toLocaleString('th-TH'),
+                timestamp: Date.now()
+            };
+
+            installmentPaymentsData.unshift(paymentData);
+            saveInstallmentPaymentsToStorage();
+
+            activeTicketForPrint = paymentData;
+            activePrintType = 'installment';
+
+            if (submitter === 'save_and_print') {
+                openPrintPreview(paymentData, 'installment');
+            } else {
+                alert(`บันทึกการชำระค่างวดสำเร็จ! เลขที่ใบเสร็จ: ${receiptId}`);
+            }
+
+            resetInstallmentPaymentForm();
+            renderInstallmentPaymentsList();
+        }
+
+        // Render Repair List in Dashboard
+        function renderRepairList(filteredData = null) {
+            const list = filteredData || repairsData;
+            const tbody = document.getElementById('repair-list-table-body');
+            document.getElementById('badge-total-jobs').innerText = repairsData.length;
+            tbody.innerHTML = '';
+
+            if (list.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="p-8 text-center text-slate-400">
+                            <i class="fa-solid fa-inbox text-3xl mb-2 block"></i>
+                            ยังไม่มีรายการบันทึกงานซ่อม
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            list.forEach((item) => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50/80 transition text-xs sm:text-sm';
+
+                let statusBadgeClass = 'bg-slate-100 text-slate-700';
+                if (item.status === 'รับเครื่องแล้ว') statusBadgeClass = 'bg-amber-100 text-amber-800 border-amber-200';
+                if (item.status === 'กำลังซ่อม') statusBadgeClass = 'bg-blue-100 text-blue-800 border-blue-200';
+                if (item.status === 'รออะไหล่') statusBadgeClass = 'bg-orange-100 text-orange-800 border-orange-200';
+                if (item.status === 'ซ่อมเสร็จแล้ว') statusBadgeClass = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                if (item.status === 'ส่งคืนลูกค้าแล้ว') statusBadgeClass = 'bg-slate-200 text-slate-800 border-slate-300';
+
+                const itemsSummary = item.items.map(i => i.title).join(', ');
+                const itemAccessories = item.accessories || 'ตัวเครื่องอย่างเดียว';
+
+                tr.innerHTML = `
+                    <td class="p-3.5 font-mono">
+                        <span class="font-bold text-slate-800">${item.id}</span>
+                        <div class="text-[11px] text-slate-400">${item.date}</div>
+                    </td>
+                    <td class="p-3.5">
+                        <div class="font-semibold text-slate-800">${escapeHtml(item.customerName)}</div>
+                        <div class="text-xs text-slate-500"><i class="fa-solid fa-mobile-screen mr-1"></i>${escapeHtml(item.deviceModel)} (${escapeHtml(item.customerPhone)})</div>
+                    </td>
+                    <td class="p-3.5 max-w-xs">
+                        <div class="text-slate-700 font-medium truncate">${escapeHtml(itemsSummary)}</div>
+                        <div class="text-[11px] text-slate-500 truncate"><i class="fa-solid fa-boxes-packing mr-1 text-brand-500"></i>อุปกรณ์: ${escapeHtml(itemAccessories)}</div>
+                        <div class="text-[11px] text-slate-400 truncate">อาการ: ${escapeHtml(item.symptom)}</div>
+                    </td>
+                    <td class="p-3.5 text-right font-bold text-brand-600">
+                        ฿${item.total.toLocaleString('th-TH', {minimumFractionDigits: 2})}
+                    </td>
+                    <td class="p-3.5 text-center">
+                        <select onchange="updateTicketStatus('${item.id}', this.value)" class="text-xs px-2.5 py-1 rounded-full font-semibold border ${statusBadgeClass} cursor-pointer focus:outline-none">
+                            <option value="รับเครื่องแล้ว" ${item.status === 'รับเครื่องแล้ว' ? 'selected' : ''}>🟡 รับเครื่องแล้ว</option>
+                            <option value="กำลังซ่อม" ${item.status === 'กำลังซ่อม' ? 'selected' : ''}>🔵 กำลังซ่อม</option>
+                            <option value="รออะไหล่" ${item.status === 'รออะไหล่' ? 'selected' : ''}>🟠 รออะไหล่</option>
+                            <option value="ซ่อมเสร็จแล้ว" ${item.status === 'ซ่อมเสร็จแล้ว' ? 'selected' : ''}>🟢 ซ่อมเสร็จแล้ว</option>
+                            <option value="ส่งคืนลูกค้าแล้ว" ${item.status === 'ส่งคืนลูกค้าแล้ว' ? 'selected' : ''}>✅ ส่งคืนแล้ว</option>
+                        </select>
+                    </td>
+                    <td class="p-3.5 text-center">
+                        <div class="flex items-center justify-center space-x-1">
+                            <button onclick="reprintTicket('${item.id}')" title="พิมพ์สลิปซ้ำ" class="p-1.5 bg-slate-100 hover:bg-brand-50 hover:text-brand-600 text-slate-600 rounded-lg transition">
+                                <i class="fa-solid fa-print"></i>
+                            </button>
+                            <button onclick="deleteTicket('${item.id}')" title="ลบรายการ" class="p-1.5 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 rounded-lg transition">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Render Installment Payments History Table
+        function renderInstallmentPaymentsList(filteredData = null) {
+            const list = filteredData || installmentPaymentsData;
+            const tbody = document.getElementById('installment-pay-table-body');
+            document.getElementById('badge-installment-payments').innerText = installmentPaymentsData.length;
+            tbody.innerHTML = '';
+
+            if (list.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="p-8 text-center text-slate-400">
+                            <i class="fa-solid fa-receipt text-3xl mb-2 block"></i>
+                            ยังไม่มีประวัติการรับชำระค่างวด
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            list.forEach((item) => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50/80 transition text-xs sm:text-sm';
+
+                tr.innerHTML = `
+                    <td class="p-3 font-mono">
+                        <span class="font-bold text-emerald-700">${item.id}</span>
+                        <div class="text-[11px] text-slate-400">${item.date}</div>
+                    </td>
+                    <td class="p-3">
+                        <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">${escapeHtml(item.provider || 'ค่างวดมือถือ')}</span>
+                        <div class="text-xs text-slate-500 mt-1">${escapeHtml(item.deviceModel)}</div>
+                    </td>
+                    <td class="p-3">
+                        <div class="font-semibold text-slate-800">${escapeHtml(item.customerName)}</div>
+                        <div class="text-xs text-slate-500 font-mono">สัญญา: ${escapeHtml(item.contractNo)}</div>
+                    </td>
+                    <td class="p-3 text-right font-bold text-emerald-600">
+                        ฿${item.totalAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})}
+                    </td>
+                    <td class="p-3 text-center">
+                        <span class="px-2.5 py-1 rounded-full text-xs font-semibold ${item.paymentMethod === 'เงินสด' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}">
+                            ${item.paymentMethod}
+                        </span>
+                    </td>
+                    <td class="p-3 text-center">
+                        <div class="flex items-center justify-center space-x-1">
+                            <button onclick="reprintInstallmentReceipt('${item.id}')" title="พิมพ์ใบเสร็จซ้ำ" class="p-1.5 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-600 text-slate-600 rounded-lg transition">
+                                <i class="fa-solid fa-print"></i>
+                            </button>
+                            <button onclick="deleteInstallmentPayment('${item.id}')" title="ลบรายการ" class="p-1.5 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 rounded-lg transition">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Filter Installment Payments
+        function filterInstallmentPayments() {
+            const query = document.getElementById('search-pay-input').value.toLowerCase().trim();
+            const filtered = installmentPaymentsData.filter(item => {
+                return item.id.toLowerCase().includes(query) ||
+                       (item.provider && item.provider.toLowerCase().includes(query)) ||
+                       item.contractNo.toLowerCase().includes(query) ||
+                       item.customerName.toLowerCase().includes(query) ||
+                       item.customerPhone.toLowerCase().includes(query);
+            });
+            renderInstallmentPaymentsList(filtered);
+        }
+
+        // Update Status Directly from Table
+        function updateTicketStatus(id, newStatus) {
+            const index = repairsData.findIndex(r => r.id === id);
+            if (index !== -1) {
+                repairsData[index].status = newStatus;
+                saveRepairsToStorage();
+                renderRepairList();
+            }
+        }
+
+        // Filter Repair List
+        function filterRepairList() {
+            const query = document.getElementById('search-input').value.toLowerCase().trim();
+            const statusFilter = document.getElementById('filter-status').value;
+
+            const filtered = repairsData.filter(item => {
+                const matchesSearch = item.id.toLowerCase().includes(query) ||
+                                      item.customerName.toLowerCase().includes(query) ||
+                                      item.customerPhone.toLowerCase().includes(query) ||
+                                      item.deviceModel.toLowerCase().includes(query) ||
+                                      (item.accessories && item.accessories.toLowerCase().includes(query));
+                
+                const matchesStatus = (statusFilter === 'ALL') || (item.status === statusFilter);
+
+                return matchesSearch && matchesStatus;
+            });
+
+            renderRepairList(filtered);
+        }
+
+        // Delete Repair Ticket
+        function deleteTicket(id) {
+            if (confirm(`คุณต้องการลบรายการใบซ่อมเลขที่ ${id} ใช่หรือไม่?`)) {
+                repairsData = repairsData.filter(r => r.id !== id);
+                saveRepairsToStorage();
+                renderRepairList();
+            }
+        }
+
+        // Delete Installment Payment
+        function deleteInstallmentPayment(id) {
+            if (confirm(`คุณต้องการลบประวัติชำระค่างวดเลขที่ใบเสร็จ ${id} ใช่หรือไม่?`)) {
+                installmentPaymentsData = installmentPaymentsData.filter(p => p.id !== id);
+                saveInstallmentPaymentsToStorage();
+                renderInstallmentPaymentsList();
+            }
+        }
+
+        // Reprint Ticket Button Action
+        function reprintTicket(id) {
+            const ticket = repairsData.find(r => r.id === id);
+            if (ticket) {
+                activeTicketForPrint = ticket;
+                activePrintType = 'repair';
+                openPrintPreview(ticket, 'repair');
+            }
+        }
+
+        // Reprint Installment Receipt Button Action
+        function reprintInstallmentReceipt(id) {
+            const payment = installmentPaymentsData.find(p => p.id === id);
+            if (payment) {
+                activeTicketForPrint = payment;
+                activePrintType = 'installment';
+                openPrintPreview(payment, 'installment');
+            }
+        }
+
+        // PRINT RECEIPT BUILDER & MODAL LOGIC
+        function openPrintPreview(data, type = 'repair') {
+            const container = document.getElementById('receipt-content-preview');
+            activePrintType = type;
+            if (type === 'installment') {
+                container.innerHTML = generateInstallmentReceiptHTML(data);
+            } else {
+                container.innerHTML = generateReceiptHTML(data);
+            }
+            document.getElementById('modal-print-preview').classList.remove('hidden');
+        }
+
+        // Generate Repair Receipt HTML Template
+        function generateReceiptHTML(data) {
+            const itemsRows = data.items.map(item => `
+                <div class="flex justify-between py-1 border-b border-dashed border-slate-200">
+                    <span class="font-medium pr-2">${escapeHtml(item.title)}</span>
+                    <span class="font-bold whitespace-nowrap">฿${parseFloat(item.price).toLocaleString('th-TH', {minimumFractionDigits:2})}</span>
+                </div>
+            `).join('');
+
+            const qrSection = shopConfig.qrImageData ? `
+                <div class="mt-4 pt-3 border-t border-dashed border-slate-300 text-center flex flex-col items-center justify-center">
+                    <p class="text-[11px] font-bold text-slate-700 mb-1">สแกนชำระเงิน (PromptPay / Bank)</p>
+                    <img src="${shopConfig.qrImageData}" class="w-28 h-28 object-contain border border-slate-200 p-1 bg-white rounded-lg shadow-sm">
+                </div>
+            ` : '';
+
+            const accessoriesStr = data.accessories || 'ตัวเครื่องอย่างเดียว';
+
+            return `
+                <div class="text-center pb-3 border-b border-dashed border-slate-300">
+                    <h2 class="font-bold text-base uppercase tracking-tight text-slate-900">${escapeHtml(shopConfig.name)}</h2>
+                    ${shopConfig.phone ? `<p class="text-[11px] text-slate-600">โทร: ${escapeHtml(shopConfig.phone)}</p>` : ''}
+                    ${shopConfig.address ? `<p class="text-[10px] text-slate-500">${escapeHtml(shopConfig.address)}</p>` : ''}
+                </div>
+
+                <div class="py-2 text-center bg-slate-100 my-2 rounded font-bold text-xs uppercase tracking-wider text-slate-700">
+                    ใบรับซ่อม / ใบแจ้งบริการ
+                </div>
+
+                <div class="py-2.5 text-[11px] space-y-0.5 border-b border-dashed border-slate-300">
+                    <div class="flex justify-between"><span class="text-slate-500">เลขที่ใบซ่อม:</span><span class="font-bold font-mono text-slate-800">${data.id}</span></div>
+                    <div class="flex justify-between"><span class="text-slate-500">วันที่:</span><span>${data.date}</span></div>
+                    <div class="flex justify-between"><span class="text-slate-500">ลูกค้า:</span><span class="font-medium">${escapeHtml(data.customerName)} (${escapeHtml(data.customerPhone)})</span></div>
+                    <div class="flex justify-between"><span class="text-slate-500">อุปกรณ์:</span><span class="font-medium">${escapeHtml(data.deviceModel)}</span></div>
+                    <div class="flex justify-between"><span class="text-slate-500">อุปกรณ์ติดมา:</span><span class="font-medium text-slate-800">${escapeHtml(accessoriesStr)}</span></div>
+                    ${data.symptom && data.symptom !== '-' ? `<div class="flex justify-between"><span class="text-slate-500">อาการเสีย:</span><span>${escapeHtml(data.symptom)}</span></div>` : ''}
+                </div>
+
+                <div class="py-2">
+                    <div class="text-[11px] font-bold text-slate-700 mb-1">รายการงานซ่อม/บริการ:</div>
+                    ${itemsRows}
+                </div>
+
+                <div class="pt-2 border-t border-slate-800 space-y-1 text-right">
+                    <div class="flex justify-between text-[11px]">
+                        <span class="text-slate-600">รวมเงิน:</span>
+                        <span class="font-semibold">฿${data.subtotal.toLocaleString('th-TH', {minimumFractionDigits:2})}</span>
+                    </div>
+                    ${data.deposit > 0 ? `
+                    <div class="flex justify-between text-[11px] text-rose-600">
+                        <span>หักมัดจำ:</span>
+                        <span>-฿${data.deposit.toLocaleString('th-TH', {minimumFractionDigits:2})}</span>
+                    </div>
+                    ` : ''}
+                    <div class="flex justify-between text-sm font-extrabold text-slate-900 pt-1 border-t border-dashed border-slate-200">
+                        <span>ยอดชำระคงเหลือ:</span>
+                        <span>฿${data.total.toLocaleString('th-TH', {minimumFractionDigits:2})}</span>
+                    </div>
+                </div>
+
+                ${qrSection}
+
+                <div class="mt-4 pt-3 border-t border-dashed border-slate-300 text-center text-[10px] text-slate-500 space-y-1">
+                    <p class="font-medium">${escapeHtml(shopConfig.footer)}</p>
+                    <p class="text-[9px] text-slate-400">ขอบคุณที่ไว้วางใจใช้บริการ</p>
+                </div>
+            `;
+        }
+
+        // Generate Installment Payment Receipt HTML Template
+        function generateInstallmentReceiptHTML(data) {
+            const qrSection = shopConfig.qrImageData ? `
+                <div class="mt-4 pt-3 border-t border-dashed border-slate-300 text-center flex flex-col items-center justify-center">
+                    <p class="text-[11px] font-bold text-slate-700 mb-1">สแกนชำระเงิน (PromptPay / Bank)</p>
+                    <img src="${shopConfig.qrImageData}" class="w-28 h-28 object-contain border border-slate-200 p-1 bg-white rounded-lg shadow-sm">
+                </div>
+            ` : '';
+
+            return `
+                <div class="text-center pb-3 border-b border-dashed border-slate-300">
+                    <h2 class="font-bold text-base uppercase tracking-tight text-slate-900">${escapeHtml(shopConfig.name)}</h2>
+                    ${shopConfig.phone ? `<p class="text-[11px] text-slate-600">โทร: ${escapeHtml(shopConfig.phone)}</p>` : ''}
+                    ${shopConfig.address ? `<p class="text-[10px] text-slate-500">${escapeHtml(shopConfig.address)}</p>` : ''}
+                </div>
+
+                <div class="py-2 text-center bg-emerald-100 text-emerald-800 my-2 rounded font-bold text-xs tracking-wider">
+                    ใบเสร็จรับเงิน / รับชำระค่างวด
+                </div>
+
+                <div class="py-2 text-[11px] space-y-1 border-b border-dashed border-slate-300">
+                    <div class="flex justify-between"><span class="text-slate-500">เลขที่ใบเสร็จ:</span><span class="font-bold font-mono text-emerald-700">${data.id}</span></div>
+                    <div class="flex justify-between"><span class="text-slate-500">บริการสินเชื่อ:</span><span class="font-bold text-emerald-800">${escapeHtml(data.provider || 'ค่างวดมือถือ')}</span></div>
+                    <div class="flex justify-between"><span class="text-slate-500">เลขที่สัญญา/Ref:</span><span class="font-bold font-mono text-slate-800">${escapeHtml(data.contractNo)}</span></div>
+                    <div class="flex justify-between"><span class="text-slate-500">วันที่รับชำระ:</span><span>${data.date}</span></div>
+                    <div class="flex justify-between"><span class="text-slate-500">ชื่อผู้ชำระ:</span><span class="font-semibold text-slate-800">${escapeHtml(data.customerName)}</span></div>
+                    ${data.customerPhone !== '-' ? `<div class="flex justify-between"><span class="text-slate-500">เบอร์โทรศัพท์:</span><span>${escapeHtml(data.customerPhone)}</span></div>` : ''}
+                    <div class="flex justify-between"><span class="text-slate-500">อุปกรณ์/รุ่น:</span><span class="font-medium">${escapeHtml(data.deviceModel)}</span></div>
+                </div>
+
+                <div class="py-3 border-b border-dashed border-slate-300 space-y-1.5 text-[11px]">
+                    <div class="font-bold text-slate-700 pb-1 flex justify-between">
+                        <span>รายการรับชำระ</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-600">ยอดชำระค่างวด:</span>
+                        <span class="font-medium">฿${data.amount.toLocaleString('th-TH', {minimumFractionDigits:2})}</span>
+                    </div>
+                    ${data.penaltyFee > 0 ? `
+                    <div class="flex justify-between text-rose-600">
+                        <span>ค่าธรรมเนียม / ค่าบริการเพิ่ม:</span>
+                        <span>+฿${data.penaltyFee.toLocaleString('th-TH', {minimumFractionDigits:2})}</span>
+                    </div>
+                    ` : ''}
+                    <div class="flex justify-between text-slate-600">
+                        <span>ช่องทางชำระเงิน:</span>
+                        <span class="font-semibold text-slate-800">${data.paymentMethod}</span>
+                    </div>
+                </div>
+
+                <div class="py-2 text-right space-y-1">
+                    <div class="flex justify-between text-sm font-extrabold text-emerald-700 pt-1">
+                        <span>ยอดชำระรวมสุทธิ:</span>
+                        <span>฿${data.totalAmount.toLocaleString('th-TH', {minimumFractionDigits:2})}</span>
+                    </div>
+                    ${data.remainingBalance !== null && !isNaN(data.remainingBalance) ? `
+                    <div class="flex justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+                        <span>ยอดคงเหลือสัญญา:</span>
+                        <span class="font-semibold text-slate-700">฿${data.remainingBalance.toLocaleString('th-TH', {minimumFractionDigits:2})}</span>
+                    </div>
+                    ` : ''}
+                </div>
+
+                ${qrSection}
+
+                <div class="mt-4 pt-3 border-t border-dashed border-slate-300 text-center text-[10px] text-slate-500 space-y-1">
+                    <p class="font-medium">ได้รับเงินถูกต้องครบถ้วนแล้ว ขอบคุณที่ใช้บริการ</p>
+                    <p class="text-[9px] text-slate-400">${escapeHtml(shopConfig.footer)}</p>
+                </div>
+            `;
+        }
+
+        // Paper Size Switcher
+        function changePaperSize(size) {
+            const wrapper = document.getElementById('receipt-paper-wrapper');
+            wrapper.className = 'bg-white shadow-md border border-slate-300 transition-all duration-200 text-slate-900 ';
+            if (size === '58mm') wrapper.classList.add('paper-58mm');
+            else if (size === '80mm') wrapper.classList.add('paper-80mm');
+            else if (size === 'a4') wrapper.classList.add('paper-a4');
+        }
+
+        // Trigger Actual Browser Print
+        function triggerActualPrint() {
+            if (!activeTicketForPrint) return;
+
+            const printArea = document.getElementById('print-area');
+            const paperSize = document.getElementById('paper-size-select').value;
+            const content = activePrintType === 'installment' 
+                ? generateInstallmentReceiptHTML(activeTicketForPrint) 
+                : generateReceiptHTML(activeTicketForPrint);
+
+            printArea.innerHTML = `
+                <div class="${paperSize === '58mm' ? 'paper-58mm' : paperSize === '80mm' ? 'paper-80mm' : 'paper-a4'} mx-auto">
+                    ${content}
+                </div>
+            `;
+
+            printArea.classList.remove('hidden');
+            window.print();
+            printArea.classList.add('hidden');
+        }
+
+        // Dashboard Navigation Tabs Switch
+        function switchTab(tab) {
+            const tabNew = document.getElementById('tab-new-repair');
+            const tabList = document.getElementById('tab-list');
+            const tabInstallment = document.getElementById('tab-installment');
+            const tabPayInstallment = document.getElementById('tab-pay-installment');
+            
+            const btnNew = document.getElementById('nav-btn-new-repair');
+            const btnList = document.getElementById('nav-btn-list');
+            const btnInstallment = document.getElementById('nav-btn-installment');
+            const btnPayInstallment = document.getElementById('nav-btn-pay-installment');
+
+            // Hide all tabs
+            tabNew.classList.add('hidden');
+            tabList.classList.add('hidden');
+            tabInstallment.classList.add('hidden');
+            tabPayInstallment.classList.add('hidden');
+
+            // Reset button styles
+            const defaultStyle = "w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between text-slate-600 hover:bg-slate-50 hover:text-slate-900 mt-1";
+            btnNew.className = "w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between text-slate-600 hover:bg-slate-50 hover:text-slate-900";
+            btnList.className = defaultStyle;
+            btnInstallment.className = defaultStyle;
+            btnPayInstallment.className = defaultStyle;
+
+            if (tab === 'new-repair') {
+                tabNew.classList.remove('hidden');
+                btnNew.className = "w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between bg-brand-50 text-brand-600 border border-brand-100";
+            } else if (tab === 'pay-installment') {
+                tabPayInstallment.classList.remove('hidden');
+                btnPayInstallment.className = "w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between bg-emerald-50 text-emerald-700 border border-emerald-200 mt-1";
+                renderInstallmentPaymentsList();
+            } else if (tab === 'installment') {
+                tabInstallment.classList.remove('hidden');
+                btnInstallment.className = "w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between bg-amber-50 text-amber-700 border border-amber-200 mt-1";
+            } else {
+                tabList.classList.remove('hidden');
+                btnList.className = "w-full text-left px-4 py-3 rounded-xl font-medium transition flex items-center justify-between bg-brand-50 text-brand-600 border border-brand-100 mt-1";
+                renderRepairList();
+            }
+        }
+
+        // Dashboard Stats Summary Update
+        function updateDashboardStats() {
+            const pending = repairsData.filter(r => r.status === 'รับเครื่องแล้ว' || r.status === 'กำลังซ่อม' || r.status === 'รออะไหล่').length;
+            const ready = repairsData.filter(r => r.status === 'ซ่อมเสร็จแล้ว').length;
+            const completed = repairsData.filter(r => r.status === 'ส่งคืนลูกค้าแล้ว').length;
+
+            document.getElementById('stat-pending').innerText = pending;
+            document.getElementById('stat-ready').innerText = ready;
+            document.getElementById('stat-completed').innerText = completed;
+            document.getElementById('stat-installment-count').innerText = installmentPaymentsData.length;
+        }
+
+        // Modal Helpers
+        function openShopSettingsModal() {
+            document.getElementById('modal-shop-settings').classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        // Utility: HTML Escaper to Prevent XSS
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
